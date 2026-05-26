@@ -1,0 +1,76 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\MessageController;
+use App\Http\Controllers\Api\StoryController;
+
+Route::middleware('throttle:5,1')->group(function () {
+
+    Route::post(
+        '/register',
+        [AuthController::class, 'register']
+    );
+
+    Route::post(
+        '/login',
+        [AuthController::class, 'login']
+    );
+});
+
+Route::middleware(['jwt.auth'])->group(function () {
+
+    Route::get('/me', [AuthController::class, 'me']);
+
+    Route::post('/logout', [AuthController::class, 'logout']);
+
+    Route::get('/profile', [ProfileController::class, 'show']);
+
+    Route::patch('/profile', [ProfileController::class, 'update']);
+
+    Route::post(
+        '/profile/photo',
+        [ProfileController::class, 'uploadPhoto']
+    );
+
+    Route::get('/users', [
+        UserController::class,
+        'index'
+    ]);
+
+    Route::post(
+        '/conversations',
+        [ConversationController::class, 'create']
+    );
+
+    Route::get(
+        '/conversations',
+        [ConversationController::class, 'index']
+    );
+
+    Route::post(
+        '/messages',
+        [MessageController::class, 'send']
+    );
+
+    Route::get(
+        '/messages/{conversationId}',
+        [MessageController::class, 'list']
+    );
+
+    Route::post(
+        '/stories',
+        [StoryController::class, 'store']
+    );
+    Route::get(
+        '/stories',
+        [StoryController::class, 'index']
+    );
+    Route::get(
+        '/stories/{id}',
+        [StoryController::class, 'show']
+    );
+});
