@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\StoryController;
+use App\Http\Controllers\Api\CallController;
 
 Route::middleware('throttle:5,1')->group(function () {
 
@@ -72,5 +73,20 @@ Route::middleware(['jwt.auth'])->group(function () {
     Route::get(
         '/stories/{id}',
         [StoryController::class, 'show']
+    );
+
+    Route::post(
+        '/calls/start',
+        [CallController::class, 'start']
+    );
+
+    Route::post(
+        '/calls/{id}/accept',
+        [CallController::class, 'accept']
+    );
+
+    Route::post(
+        '/calls/{id}/end',
+        [CallController::class, 'end']
     );
 });

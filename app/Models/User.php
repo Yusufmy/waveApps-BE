@@ -39,4 +39,9 @@ class User extends Authenticatable implements JWTSubject
             'conversation_participants'
         );
     }
+
+    public function stories()
+    {
+        return $this->hasMany(Story::class);
+    }
 }
