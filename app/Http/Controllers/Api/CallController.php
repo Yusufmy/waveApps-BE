@@ -105,9 +105,14 @@ class CallController extends Controller
     {
         $call = Call::findOrFail($id);
 
+        $duration = now()->diffInSeconds(
+            $call->started_at
+        );
+
         $call->update([
             'status' => 'ended',
             'ended_at' => now(),
+            'duration' => $duration,
         ]);
 
         app('firebase.database')
@@ -140,6 +145,27 @@ class CallController extends Controller
 
         return response()->json([
             'status' => true
+        ]);
+    }
+    /**
+     * History Call
+     */
+    public function history()
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+
+        $calls = Call::with([
+            'caller',
+            'receiver'
+        ])
+            ->where('caller_id', $user->id)
+            ->orWhere('receiver_id', $user->id)
+            ->latest()
+            ->paginate(20);
+
+        return response()->json([
+            'status' => true,
+            'data' => $calls
         ]);
     }
 }

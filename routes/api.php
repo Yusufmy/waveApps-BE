@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\StoryController;
 use App\Http\Controllers\Api\CallController;
+use App\Http\Controllers\Api\FCMController;
 
 Route::middleware('throttle:5,1')->group(function () {
 
@@ -75,18 +76,38 @@ Route::middleware(['jwt.auth'])->group(function () {
         [StoryController::class, 'show']
     );
 
-    Route::post(
-        '/calls/start',
-        [CallController::class, 'start']
-    );
+    Route::post('/calls/start', [
+        CallController::class,
+        'start'
+    ]);
+
+    Route::post('/calls/{id}/accept', [
+        CallController::class,
+        'accept'
+    ]);
+
+    Route::post('/calls/{id}/reject', [
+        CallController::class,
+        'reject'
+    ]);
+
+    Route::post('/calls/{id}/end', [
+        CallController::class,
+        'end'
+    ]);
+
+    Route::get('/calls/history', [
+        CallController::class,
+        'history'
+    ]);
 
     Route::post(
-        '/calls/{id}/accept',
-        [CallController::class, 'accept']
+        '/save-fcm-token',
+        [FCMController::class, 'saveFcmToken']
     );
-
-    Route::post(
-        '/calls/{id}/end',
-        [CallController::class, 'end']
+    
+    Route::get(
+        '/test-notification/{userId}',
+        [FCMController::class, 'testNotification']
     );
 });
