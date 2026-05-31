@@ -83,7 +83,6 @@ class ConversationController extends Controller
                 'message' => 'Conversation berhasil dibuat',
                 'data' => $conversation
             ]);
-
         } catch (ValidationException $e) {
 
             return response()->json([
@@ -91,7 +90,6 @@ class ConversationController extends Controller
                 'message' => collect($e->errors())->flatten()->first(),
                 'errors' => $e->errors(),
             ], 422);
-
         } catch (\Throwable $e) {
 
             return response()->json([
@@ -111,6 +109,7 @@ class ConversationController extends Controller
         $conversations = $user
             ->conversations()
             ->with('participants')
+            ->whereNotNull('last_message')
             ->orderByDesc('last_message_at')
             ->get();
 
