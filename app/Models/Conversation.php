@@ -8,6 +8,7 @@ class Conversation extends Model
 {
     protected $fillable = [
         'type',
+        'created_by',
         'last_message',
         'last_message_at'
     ];
@@ -15,6 +16,14 @@ class Conversation extends Model
     protected $casts = [
         'last_message_at' => 'datetime'
     ];
+
+    public function creator()
+    {
+        return $this->belongsTo(
+            User::class,
+            'created_by'
+        );
+    }
 
     public function participants()
     {

@@ -27,6 +27,7 @@ class AuthController extends Controller
 
             $request->validate([
                 'name' => 'required|string|min:3|max:100',
+                'username' => 'required|string|min:3|max:30|unique:users,username',
                 'email' => 'required|email:rfc,dns|max:255|unique:users,email',
                 'password' => [
                     'required',
@@ -68,6 +69,7 @@ class AuthController extends Controller
             $user = User::create([
                 'firebase_uid' => $firebaseUser->uid,
                 'name' => trim($request->name),
+                'username' => strtolower(trim($request->username)),
                 'email' => strtolower(trim($request->email)),
                 'password' => Hash::make($request->password),
             ]);

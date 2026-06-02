@@ -59,6 +59,7 @@ class MessageController extends Controller
             // Kirim ke Firebase Realtime Database
             $database = app('firebase.database');
 
+            // simpan pesan
             $firebaseMessage = $database
                 ->getReference(
                     "messages/{$request->conversation_id}"
@@ -68,10 +69,21 @@ class MessageController extends Controller
                     'conversation_id' => $message->conversation_id,
                     'sender_id'       => $message->sender_id,
                     'sender_name'     => $user->name,
+                    'photo'           => $user->photo,
                     'message'         => $message->message,
                     'message_type'    => 'text',
                     'status'          => 'sent',
                     'created_at'      => now()->timestamp,
+                ]);
+
+            // update room meta
+            $database
+                ->getReference(
+                    "rooms/{$request->conversation_id}/meta"
+                )
+                ->update([
+                    'last_message'    => $message->message,
+                    'last_message_at' => now()->toDateTimeString(),
                 ]);
 
             // $message->update([

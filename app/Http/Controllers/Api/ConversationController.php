@@ -28,6 +28,8 @@ class ConversationController extends Controller
 
             $authUser = JWTAuth::parseToken()->authenticate();
 
+            $targetUser = User::findOrFail($request->user_id);
+
             if ($authUser->id == $request->user_id) {
 
                 return response()->json([
@@ -60,8 +62,42 @@ class ConversationController extends Controller
 
             // buat conversation baru
             $conversation = Conversation::create([
-                'type' => 'private'
+                'type' => 'private',
+                'created_by' => $authUser->id,
             ]);
+
+            $database = app('firebase.database');
+
+            $roomId = $conversation->id;
+
+            $database
+                ->getReference("rooms/$roomId")
+                ->set([
+                    'meta' => [
+                        'id' => $roomId,
+                        'type' => 'private',
+                        'created_by' => $authUser->id,
+                        'created_at' => now()->toDateTimeString(),
+                        'last_message' => "",
+                        'last_message_at' => "",
+                    ],
+
+                    'participants' => [
+                        (string) $authUser->id => [
+                            'user_id' => $authUser->id,
+                            'name' => $authUser->name,
+                            'photo' => $authUser->photo,
+                            'joined_at' => now()->toDateTimeString(),
+                        ],
+
+                        (string) $targetUser->id => [
+                            'user_id' => $targetUser->id,
+                            'name' => $targetUser->name,
+                            'photo' => $targetUser->photo,
+                            'joined_at' => now()->toDateTimeString(),
+                        ],
+                    ]
+                ]);
 
             ConversationParticipant::insert([
                 [
@@ -109,7 +145,16 @@ class ConversationController extends Controller
         $conversations = $user
             ->conversations()
             ->with('participants')
-            ->whereNotNull('last_message')
+            ->where(function ($query) use ($user) {
+
+                $query->whereNotNull('last_message')
+
+                    ->orWhere(
+                        'created_by',
+                        $user->id
+                    );
+            })
+            ->orderByRaw('last_message_at IS NULL')
             ->orderByDesc('last_message_at')
             ->get();
 
