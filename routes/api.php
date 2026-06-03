@@ -64,6 +64,11 @@ Route::middleware(['jwt.auth'])->group(function () {
     );
 
     Route::post(
+        '/read/{conversationId}',
+        [MessageController::class, 'markAsRead']
+    );
+
+    Route::post(
         '/stories',
         [StoryController::class, 'store']
     );
@@ -105,7 +110,7 @@ Route::middleware(['jwt.auth'])->group(function () {
         '/save-fcm-token',
         [FCMController::class, 'saveFcmToken']
     );
-    
+
     Route::get(
         '/test-notification/{userId}',
         [FCMController::class, 'testNotification']

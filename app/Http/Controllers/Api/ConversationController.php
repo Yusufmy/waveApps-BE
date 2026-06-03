@@ -88,6 +88,7 @@ class ConversationController extends Controller
                             'name' => $authUser->name,
                             'photo' => $authUser->photo,
                             'joined_at' => now()->toDateTimeString(),
+                            'unread_count' => 0,
                         ],
 
                         (string) $targetUser->id => [
@@ -95,6 +96,7 @@ class ConversationController extends Controller
                             'name' => $targetUser->name,
                             'photo' => $targetUser->photo,
                             'joined_at' => now()->toDateTimeString(),
+                            'unread_count' => 0,
                         ],
                     ]
                 ]);

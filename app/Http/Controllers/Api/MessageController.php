@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\Message;
+use App\Models\ConversationParticipant;
 use Illuminate\Validation\ValidationException;
 
 class MessageController extends Controller
@@ -86,6 +87,24 @@ class MessageController extends Controller
                     'last_message_at' => now()->toDateTimeString(),
                 ]);
 
+            $participants = ConversationParticipant::where(
+                'conversation_id',
+                $request->conversation_id
+            )
+                ->where('user_id', '!=', $user->id)
+                ->pluck('user_id');
+
+            foreach ($participants as $participantId) {
+
+                $ref = $database->getReference(
+                    "rooms/{$request->conversation_id}/participants/{$participantId}/unread_count"
+                );
+
+                $current = $ref->getValue() ?? 0;
+
+                $ref->set($current + 1);
+            }
+
             // $message->update([
             //     'firebase_key' => $firebaseMessage->getKey()
             // ]);
@@ -142,6 +161,23 @@ class MessageController extends Controller
         return response()->json([
             'status' => true,
             'data' => $messages
+        ]);
+    }
+
+    public function markAsRead($conversationId)
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+
+        $database = app('firebase.database');
+
+        $database
+            ->getReference(
+                "rooms/{$conversationId}/participants/{$user->id}/unread_count"
+            )
+            ->set(0);
+
+        return response()->json([
+            'status' => true
         ]);
     }
 }
