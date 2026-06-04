@@ -130,6 +130,64 @@ class MessageController extends Controller
         }
     }
 
+    public function delivered(Request $request)
+    {
+        try {
+
+            $request->validate([
+                'message_ids' => 'required|array',
+                'message_ids.*' => 'exists:messages,id',
+            ]);
+
+            $database = app('firebase.database');
+
+            $messages = Message::whereIn(
+                'id',
+                $request->message_ids
+            )
+                ->where('status', 'sent')
+                ->get();
+
+            foreach ($messages as $message) {
+
+                $message->update([
+                    'status' => 'delivered',
+                    'delivered_at' => now(),
+                ]);
+
+                $snapshot = $database
+                    ->getReference(
+                        "messages/{$message->conversation_id}"
+                    )
+                    ->orderByChild('message_id')
+                    ->equalTo($message->id)
+                    ->getSnapshot();
+
+                foreach ($snapshot->getValue() ?? [] as $firebaseKey => $value) {
+
+                    $database
+                        ->getReference(
+                            "messages/{$message->conversation_id}/{$firebaseKey}"
+                        )
+                        ->update([
+                            'status' => 'delivered',
+                            'delivered_at' => now()->timestamp,
+                        ]);
+                }
+            }
+
+            return response()->json([
+                'status' => true,
+            ]);
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'status' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Ambil daftar pesan
      */
@@ -166,18 +224,65 @@ class MessageController extends Controller
 
     public function markAsRead($conversationId)
     {
-        $user = JWTAuth::parseToken()->authenticate();
+        try {
 
-        $database = app('firebase.database');
+            $user = JWTAuth::parseToken()->authenticate();
 
-        $database
-            ->getReference(
-                "rooms/{$conversationId}/participants/{$user->id}/unread_count"
+            $database = app('firebase.database');
+
+            $messages = Message::where(
+                'conversation_id',
+                $conversationId
             )
-            ->set(0);
+                ->where('sender_id', '!=', $user->id)
+                ->where('status', '!=', 'read')
+                ->get();
 
-        return response()->json([
-            'status' => true
-        ]);
+            foreach ($messages as $message) {
+
+                $message->update([
+                    'status' => 'read',
+                    'read_at' => now(),
+                ]);
+
+                $snapshot = $database
+                    ->getReference(
+                        "messages/{$conversationId}"
+                    )
+                    ->orderByChild('message_id')
+                    ->equalTo($message->id)
+                    ->getSnapshot();
+
+                foreach ($snapshot->getValue() ?? [] as $firebaseKey => $value) {
+
+                    $database
+                        ->getReference(
+                            "messages/{$conversationId}/{$firebaseKey}"
+                        )
+                        ->update([
+                            'status' => 'read',
+                            'read_at' => now()->timestamp,
+                        ]);
+                }
+            }
+
+            // reset unread badge
+            $database
+                ->getReference(
+                    "rooms/{$conversationId}/participants/{$user->id}/unread_count"
+                )
+                ->set(0);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Pesan berhasil dibaca'
+            ]);
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'status' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 }

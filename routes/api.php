@@ -58,6 +58,11 @@ Route::middleware(['jwt.auth'])->group(function () {
         [MessageController::class, 'send']
     );
 
+    Route::post(
+        '/messages-delivered',
+        [MessageController::class, 'delivered']
+    );
+
     Route::get(
         '/messages/{conversationId}',
         [MessageController::class, 'list']
