@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use App\Models\Message;
+use App\Models\User;
 use App\Models\ConversationParticipant;
 use Illuminate\Validation\ValidationException;
 
@@ -101,8 +102,24 @@ class MessageController extends Controller
                 );
 
                 $current = $ref->getValue() ?? 0;
-
                 $ref->set($current + 1);
+
+                //kirim notification
+                $receiver = User::find($participantId);
+
+                if ($receiver && $receiver->fcm_token) {
+
+                    $this->sendPushNotification(
+                        $receiver->fcm_token,
+                        $user->name,
+                        $message->message,
+                        [
+                            'conversation_id' => (string) $request->conversation_id,
+                            'sender_id'       => (string) $user->id,
+                            'type'            => 'chat',
+                        ]
+                    );
+                }
             }
 
             // $message->update([
@@ -128,6 +145,29 @@ class MessageController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    private function sendPushNotification(
+        string $token,
+        string $title,
+        string $body,
+        array $data = []
+    ) {
+        $messaging = app('firebase.messaging');
+
+        $message = \Kreait\Firebase\Messaging\CloudMessage::withTarget(
+            'token',
+            $token
+        )
+            ->withNotification(
+                \Kreait\Firebase\Messaging\Notification::create(
+                    $title,
+                    $body
+                )
+            )
+            ->withData($data);
+
+        $messaging->send($message);
     }
 
     public function delivered(Request $request)
