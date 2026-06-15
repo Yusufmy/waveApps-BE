@@ -50,4 +50,12 @@ class User extends Authenticatable implements JWTSubject
     {
         return $this->hasMany(Story::class);
     }
+
+    public function viewedStories()
+    {
+        return $this->hasMany(
+            StoryView::class,
+            'viewer_id'
+        );
+    }
 }

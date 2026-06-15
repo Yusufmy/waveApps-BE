@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Story;
+use App\Models\StoryView;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class StoryController extends Controller
@@ -44,6 +45,20 @@ class StoryController extends Controller
             'expired_at' => now()->addHours(24)
         ]);
 
+        /**
+         * FIREBASE REALTIME
+         */
+        $database = app('firebase.database');
+
+        $database
+            ->getReference("story_users/{$user->id}")
+            ->set([
+                'user_id' => $user->id,
+                'has_story' => true,
+                'last_story_id' => $story->id,
+                'updated_at' => now()->timestamp,
+            ]);
+
         return response()->json([
             'status' => true,
             'data' => $story
@@ -70,31 +85,130 @@ class StoryController extends Controller
             ->latest()
             ->get()
             ->groupBy('user_id')
+            ->map(function ($stories) {
+                return [
+                    'user' => $stories->first()->user,
+                    'stories' => $stories->values(),
+                ];
+            })
             ->values();
 
         return response()->json([
             'status' => true,
-            'data' => $stories
+            'data' => $stories,
         ]);
     }
 
     public function show($userId)
     {
+        $stories = Story::with('user')
+            ->where('user_id', $userId)
+            ->where('expired_at', '>', now())
+            ->orderBy('created_at')
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'data' => $stories,
+        ]);
+    }
+
+    public function myStory()
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+
         $stories = Story::where(
             'user_id',
-            $userId
+            $user->id
         )
             ->where(
                 'expired_at',
                 '>',
                 now()
             )
-            ->orderBy('created_at')
+            ->latest()
             ->get();
 
         return response()->json([
             'status' => true,
-            'data' => $stories
+            'has_story' => $stories->isNotEmpty(),
+            'data' => $stories,
+        ]);
+    }
+
+    public function destroy($id)
+    {
+        $user = JWTAuth::parseToken()->authenticate();
+
+        $story = Story::where('id', $id)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $story->delete();
+
+        $activeStoryCount = Story::where('user_id', $user->id)
+            ->where('expired_at', '>', now())
+            ->count();
+
+        $database = app('firebase.database');
+
+        if ($activeStoryCount <= 0) {
+
+            $database
+                ->getReference("story_users/{$user->id}")
+                ->remove();
+        } else {
+
+            $database
+                ->getReference("story_users/{$user->id}")
+                ->update([
+                    'user_id' => $user->id,
+                    'has_story' => true,
+                    'story_count' => $activeStoryCount,
+                    'updated_at' => now()->timestamp,
+                ]);
+        }
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Story berhasil dihapus',
+            'has_story' => $activeStoryCount > 0,
+            'story_count' => $activeStoryCount,
+        ]);
+    }
+
+    public function markViewed(Request $request)
+    {
+        $request->validate([
+            'story_id' => 'required|exists:stories,id'
+        ]);
+
+        $user = JWTAuth::parseToken()->authenticate();
+
+        StoryView::firstOrCreate([
+            'story_id' => $request->story_id,
+            'viewer_id' => $user->id,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Story viewed'
+        ]);
+    }
+
+    public function viewers($id)
+    {
+        $story = Story::findOrFail($id);
+
+        $viewers = StoryView::with('viewer')
+            ->where('story_id', $id)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'count' => $viewers->count(),
+            'data' => $viewers
         ]);
     }
 }

@@ -77,15 +77,27 @@ Route::middleware(['jwt.auth'])->group(function () {
         '/stories',
         [StoryController::class, 'store']
     );
+
     Route::get(
         '/stories',
         [StoryController::class, 'index']
     );
+
+    Route::get(
+        '/stories/me',
+        [StoryController::class, 'myStory']
+    );
+
+    Route::delete(
+        '/stories/{id}',
+        [StoryController::class, 'destroy']
+    );
+
     Route::get(
         '/stories/{id}',
         [StoryController::class, 'show']
     );
-
+    
     Route::post('/calls/start', [
         CallController::class,
         'start'
