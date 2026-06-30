@@ -61,6 +61,7 @@ class CallController extends Controller
                 'conversation_id' => $request->conversation_id,
                 'caller_id' => $user->id,
                 'caller_name' => $user->name,
+                'caller_photo' => $user->photo,
                 'receiver_id' => $request->receiver_id,
                 'type' => $request->type,
                 'status' => 'ringing',
@@ -105,13 +106,15 @@ class CallController extends Controller
     {
         $call = Call::findOrFail($id);
 
-        $duration = now()->diffInSeconds(
-            $call->started_at
-        );
+        $endedAt = now();
+
+        $duration = $call->started_at
+            ? $call->started_at->diffInSeconds($endedAt)
+            : 0;
 
         $call->update([
             'status' => 'ended',
-            'ended_at' => now(),
+            'ended_at' => $endedAt,
             'duration' => $duration,
         ]);
 
@@ -122,9 +125,11 @@ class CallController extends Controller
             ]);
 
         return response()->json([
-            'status' => true
+            'status' => true,
+            'duration' => $duration,
         ]);
     }
+
     /**
      * Reject All call
      */

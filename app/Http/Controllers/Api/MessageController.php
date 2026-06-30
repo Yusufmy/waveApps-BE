@@ -9,19 +9,60 @@ use App\Models\Message;
 use App\Models\User;
 use App\Models\ConversationParticipant;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
     /**
      * Kirim pesan
      */
+    private function getLastMessage($message)
+    {
+        switch ($message->message_type) {
+
+            case 'text':
+                return $message->message;
+
+            case 'image':
+                return "📷 Photo";
+
+            case 'video':
+                return "🎥 Video";
+
+            case 'audio':
+                return "🎤 Voice message";
+
+            case 'file':
+                return "📄 File";
+
+            default:
+                return "New message";
+        }
+    }
+
     public function send(Request $request)
     {
+
         try {
+
+
+            Log::info("FIELDS", $request->all());
+
+            Log::info("FILES", $request->allFiles());
+
+            Log::info("HAS FILE", [
+                'attachment_url' => $request->hasFile('attachment_url'),
+                'attachment' => $request->hasFile('attachment'),
+            ]);
 
             $request->validate([
                 'conversation_id' => 'required|exists:conversations,id',
-                'message' => 'required|string|max:5000',
+                'message_type' => 'required|in:text,image,video,audio,file',
+                'message' => 'nullable|string|max:5000',
+                'attachment_url' => 'nullable|file|max:20480',
+                'duration' => 'nullable|integer',
+                'file_name' => 'nullable|string|max:255',
+                'file_size' => 'nullable|integer',
             ], [
                 'conversation_id.required' => 'Conversation wajib dipilih',
                 'conversation_id.exists' => 'Conversation tidak ditemukan',
@@ -29,6 +70,32 @@ class MessageController extends Controller
                 'message.required' => 'Pesan wajib diisi',
                 'message.max' => 'Pesan terlalu panjang',
             ]);
+
+            switch ($request->message_type) {
+
+                case 'text':
+                    if (empty(trim($request->message))) {
+                        return response()->json([
+                            'status' => false,
+                            'message' => 'Pesan wajib diisi'
+                        ], 422);
+                    }
+                    break;
+
+                case 'audio':
+                case 'image':
+                case 'video':
+                case 'file':
+
+                    if (empty($request->attachment_url)) {
+                        return response()->json([
+                            'status' => false,
+                            'message' => 'Attachment wajib diisi'
+                        ], 422);
+                    }
+
+                    break;
+            }
 
             $user = JWTAuth::parseToken()->authenticate();
 
@@ -45,15 +112,54 @@ class MessageController extends Controller
                 ], 403);
             }
 
+            $attachmentUrl = null;
+            $fileName = null;
+            $fileSize = null;
+
+            if ($request->hasFile('attachment_url')) {
+
+                $file = $request->file('attachment_url');
+
+                $path = $file->store('chat', 'public');
+
+                $attachmentUrl = $path;
+                $fileName = $file->getClientOriginalName();
+                $fileSize = $file->getSize();
+            }
+
+            if ($request->hasFile('attachment_url')) {
+
+                Log::info("FILE MASUK");
+
+                $file = $request->file('attachment_url');
+
+                $path = $file->store('chat', 'public');
+
+                $attachmentUrl = $path;
+                $fileName = $file->getClientOriginalName();
+                $fileSize = $file->getSize();
+
+                Log::info([
+                    'path' => $path,
+                    'name' => $fileName,
+                    'size' => $fileSize,
+                ]);
+            }
+
             $message = Message::create([
                 'conversation_id' => $request->conversation_id,
                 'sender_id' => $user->id,
-                'message' => trim($request->message),
-                'message_type' => 'text',
+                'message' => trim($request->message ?? ''),
+                'message_type' => $request->message_type,
+
+                'attachment_url' => $attachmentUrl,
+                'duration' => $request->duration,
+                'file_name' => $fileName,
+                'file_size' => $fileSize,
             ]);
 
             $conversation->update([
-                'last_message'    => $message->message,
+                'last_message'    => $this->getLastMessage($message),
                 'last_message_at' => now(),
                 'last_sender_id'  => $user->id,
             ]);
@@ -73,9 +179,15 @@ class MessageController extends Controller
                     'sender_name'     => $user->name,
                     'photo'           => $user->photo,
                     'message'         => $message->message,
-                    'message_type'    => 'text',
+                    'message_type'    => $message->message_type,
+                    'attachment_url'  => $message->attachment_url,
+                    'duration'        => $message->duration,
+                    'file_name'       => $message->file_name,
+                    'file_size'       => $message->file_size,
                     'status'          => 'sent',
                     'created_at'      => now()->timestamp,
+                    'delivered_at' => null,
+                    'read_at' => null,
                 ]);
 
             // update room meta
@@ -84,7 +196,8 @@ class MessageController extends Controller
                     "rooms/{$request->conversation_id}/meta"
                 )
                 ->update([
-                    'last_message'    => $message->message,
+                    // 'last_message'    => $message->message,
+                    'last_message'    => $this->getLastMessage($message),
                     'last_message_at' => now()->toDateTimeString(),
                 ]);
 
@@ -112,7 +225,8 @@ class MessageController extends Controller
                     $this->sendPushNotification(
                         $receiver->fcm_token,
                         $user->name,
-                        $message->message,
+                        // $message->message,
+                        $this->getLastMessage($message),
                         [
                             'conversation_id' => (string) $request->conversation_id,
                             'sender_id'       => (string) $user->id,

@@ -14,7 +14,11 @@ class Message extends Model
         'status',
         'firebase_key',
         'is_read',
-        'read_at'
+        'read_at',
+        'attachment_url',
+        'duration',
+        'file_size',
+        'file_name'
     ];
 
     protected $casts = [
